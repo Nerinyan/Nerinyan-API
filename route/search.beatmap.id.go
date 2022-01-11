@@ -1,24 +1,17 @@
 package route
 
 import (
-	"fmt"
-	"github.com/pterm/pterm"
-	"github.com/thftgr/osuFastCashedBeatmapMirror/osu"
-	"github.com/thftgr/osuFastCashedBeatmapMirror/src"
+	"Nerinyan-API/bodyStruct"
+	"Nerinyan-API/db"
+	"database/sql"
+	"github.com/gofiber/fiber/v2"
 	"net/http"
 )
 
-func SearchByBeatmapId(c echo.Context) (err error) {
-	var sq SearchQuery
-	err = c.Bind(&sq)
-	if err != nil {
-		pterm.Error.Println(err)
-		c.NoContent(http.StatusInternalServerError)
-		return
-	}
-	fmt.Println(sq.MapId)
-	row := src.Maria.QueryRow(`select * from osu.beatmap where beatmap_id = ?;`, sq.MapId)
-	var Map osu.BeatmapOUT
+func SearchByBeatmapId(c *fiber.Ctx) (err error) {
+
+	row := db.Maria.QueryRow(`select * from osu.beatmap where beatmap_id = ?;`, c.Params("mi", ""))
+	var Map bodyStruct.BeatmapOUT
 	err = row.Scan(
 		//beatmap_id, beatmapset_id, mode, mode_int, status, ranked, total_length, max_combo, difficulty_rating,
 		//version, accuracy, ar, cs, drain, bpm, convert, count_circles, count_sliders, count_spinners, deleted_at,
@@ -28,10 +21,25 @@ func SearchByBeatmapId(c echo.Context) (err error) {
 		&Map.HitLength, &Map.IsScoreable, &Map.LastUpdated, &Map.Passcount, &Map.Playcount, &Map.Checksum, &Map.UserId,
 	)
 	if err != nil {
-		pterm.Error.Println(err)
-		c.NoContent(http.StatusInternalServerError)
-		return
+		if err == sql.ErrNoRows {
+			c.Status(http.StatusNotFound)
+			return c.JSON(bodyStruct.ErrorStruct{
+				Code:      "SearchByBeatmapId-002",
+				Path:      c.Path(),
+				RequestId: c.GetReqHeaders()["X-Request-ID"],
+				Error:     fiber.ErrNotFound.Error(),
+				Message:   "",
+			})
+		}
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(bodyStruct.ErrorStruct{
+			Code:      "SearchByBeatmapId-003",
+			Path:      c.Path(),
+			RequestId: c.GetReqHeaders()["X-Request-ID"],
+			Error:     err.Error(),
+			Message:   "RDBMS Request Error.",
+		})
 	}
-
-	return c.JSON(http.StatusOK, Map)
+	c.Status(http.StatusOK)
+	return c.JSON(Map)
 }

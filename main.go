@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Nerinyan-API/bancho"
 	"Nerinyan-API/config"
 	"Nerinyan-API/db"
 	"Nerinyan-API/fileHandler"
@@ -20,10 +21,14 @@ func init() {
 	config.LoadConfig()
 	go fileHandler.StartIndex()
 	db.ConnectMaria()
+	ch := make(chan struct{})
+	go bancho.LoadBancho(ch)
+	_ = <-ch
 }
 func main() {
 	f := fiber.New(fiber.Config{
-		Prefork: false,
+		Prefork:     false,
+		IdleTimeout: 60,
 	})
 	f.Use(requestid.New())
 	f.Use(logger.New(logger.Config{
@@ -36,7 +41,7 @@ func main() {
 	f.Get("/monitor", monitor.New())
 
 	// 로드벨런서.========================================================================================================
-	f.Get("/d/:id", route.BeatmapDownloadServerLoadBalance)
+	//f.Get("/d/:id", route.BeatmapDownloadServerLoadBalance)
 	// docs ============================================================================================================
 	f.Get("/", nil)
 
@@ -44,12 +49,12 @@ func main() {
 	f.Get("/health", route.Health)
 	f.Get("/robots.txt", route.Robots)
 	// 맵 파일 다운로드 ===================================================================================================
-	f.Get("/d/:id", nil)
+	f.Get("/d/:id", route.DownloadBeatmapSet)
 
 	// 비트맵 리스트 검색용 ================================================================================================
 	f.Get("/search", route.Search)
-	f.Get("/search/beatmap/:mi", nil)
-	f.Get("/search/beatmapset/:si", nil)
+	f.Get("/search/beatmap/:mi", route.SearchByBeatmapId)
+	f.Get("/search/beatmapset/:si", route.SearchByBeatmapSetId)
 
 	log.Fatal(f.Listen(":" + config.Config.Port))
 

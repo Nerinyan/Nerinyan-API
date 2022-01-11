@@ -1,25 +1,18 @@
 package route
 
 import (
+	"Nerinyan-API/bodyStruct"
+	"Nerinyan-API/db"
+	"database/sql"
 	"fmt"
-	"github.com/pterm/pterm"
-	"github.com/thftgr/osuFastCashedBeatmapMirror/osu"
-	"github.com/thftgr/osuFastCashedBeatmapMirror/src"
+	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"strings"
 )
 
-func SearchByBeatmapSetId(c echo.Context) (err error) {
-	var sq SearchQuery
-	err = c.Bind(&sq)
-	if err != nil {
-		pterm.Error.Println(err)
-		c.NoContent(http.StatusInternalServerError)
-		return
-	}
-	fmt.Println(sq.MapId)
-	row := src.Maria.QueryRow(`select * from osu.beatmapset where beatmapset_id = ?;`, sq.MapSetId)
-	var set osu.BeatmapSetsOUT
+func SearchByBeatmapSetId(c *fiber.Ctx) (err error) {
+	row := db.Maria.QueryRow(`select * from osu.beatmapset where beatmapset_id = ?;`, c.Params("si", ""))
+	var set bodyStruct.BeatmapSetsOUT
 
 	var mapids []int
 
@@ -33,38 +26,93 @@ func SearchByBeatmapSetId(c echo.Context) (err error) {
 
 		&set.Id, &set.Artist, &set.ArtistUnicode, &set.Creator, &set.FavouriteCount, &set.Hype.Current, &set.Hype.Required, &set.Nsfw, &set.PlayCount, &set.Source, &set.Status, &set.Title, &set.TitleUnicode, &set.UserId, &set.Video, &set.Availability.DownloadDisabled, &set.Availability.MoreInformation, &set.Bpm, &set.CanBeHyped, &set.DiscussionEnabled, &set.DiscussionLocked, &set.IsScoreable, &set.LastUpdated, &set.LegacyThreadUrl, &set.NominationsSummary.Current, &set.NominationsSummary.Required, &set.Ranked, &set.RankedDate, &set.Storyboard, &set.SubmittedDate, &set.Tags, &set.HasFavourited, &set.Description.Description, &set.Genre.Id, &set.Genre.Name, &set.Language.Id, &set.Language.Name, &set.RatingsString)
 	if err != nil {
-		c.NoContent(http.StatusInternalServerError)
-		return
+		if err == sql.ErrNoRows {
+			c.Status(http.StatusNotFound)
+			return c.JSON(bodyStruct.ErrorStruct{
+				Code:      "SearchByBeatmapSetId-002",
+				Path:      c.Path(),
+				RequestId: c.GetReqHeaders()["X-Request-ID"],
+				Error:     fiber.ErrNotFound.Error(),
+				Message:   "",
+			})
+		}
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(bodyStruct.ErrorStruct{
+			Code:      "SearchByBeatmapSetId-003",
+			Path:      c.Path(),
+			RequestId: c.GetReqHeaders()["X-Request-ID"],
+			Error:     err.Error(),
+			Message:   "RDBMS Request Error.",
+		})
 	}
 	mapids = append(mapids, *set.Id)
 
 	if *set.Id == 0 {
-		c.NoContent(http.StatusNotFound)
-		return
+		c.Status(http.StatusNotFound)
+		return c.JSON(bodyStruct.ErrorStruct{
+			Code:      "SearchByBeatmapSetId-004",
+			Path:      c.Path(),
+			RequestId: c.GetReqHeaders()["X-Request-ID"],
+			Error:     fiber.ErrNotFound.Error(),
+			Message:   "",
+		})
 	}
 
-	rows, err := src.Maria.Query(fmt.Sprintf(`select * from osu.beatmap where beatmapset_id in( %s ) order by difficulty_rating asc;`, strings.Trim(strings.Join(strings.Fields(fmt.Sprint(mapids)), ", "), "[]")))
+	rows, err := db.Maria.Query(fmt.Sprintf(`select * from osu.beatmap where beatmapset_id in( %s ) order by difficulty_rating asc;`, strings.Trim(strings.Join(strings.Fields(fmt.Sprint(mapids)), ", "), "[]")))
 
 	if err != nil {
-		c.NoContent(http.StatusInternalServerError)
-		return
+		if err == sql.ErrNoRows {
+			c.Status(http.StatusNotFound)
+			return c.JSON(bodyStruct.ErrorStruct{
+				Code:      "SearchByBeatmapSetId-005",
+				Path:      c.Path(),
+				RequestId: c.GetReqHeaders()["X-Request-ID"],
+				Error:     fiber.ErrNotFound.Error(),
+				Message:   "",
+			})
+		}
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(bodyStruct.ErrorStruct{
+			Code:      "SearchByBeatmapSetId-006",
+			Path:      c.Path(),
+			RequestId: c.GetReqHeaders()["X-Request-ID"],
+			Error:     err.Error(),
+			Message:   "RDBMS Request Error.",
+		})
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var Map osu.BeatmapOUT
+		var Map bodyStruct.BeatmapOUT
 		err = rows.Scan(
 			//beatmap_id, beatmapset_id, mode, mode_int, status, ranked, total_length, max_combo, difficulty_rating,
 			//version, accuracy, ar, cs, drain, bpm, convert, count_circles, count_sliders, count_spinners, deleted_at,
 			//hit_length, is_scoreable, last_updated, passcount, playcount, checksum, user_id
 			&Map.Id, &Map.BeatmapsetId, &Map.Mode, &Map.ModeInt, &Map.Status, &Map.Ranked, &Map.TotalLength, &Map.MaxCombo, &Map.DifficultyRating, &Map.Version, &Map.Accuracy, &Map.Ar, &Map.Cs, &Map.Drain, &Map.Bpm, &Map.Convert, &Map.CountCircles, &Map.CountSliders, &Map.CountSpinners, &Map.DeletedAt, &Map.HitLength, &Map.IsScoreable, &Map.LastUpdated, &Map.Passcount, &Map.Playcount, &Map.Checksum, &Map.UserId)
 		if err != nil {
-			c.NoContent(http.StatusInternalServerError)
-			return
+			if err == sql.ErrNoRows {
+				c.Status(http.StatusNotFound)
+				return c.JSON(bodyStruct.ErrorStruct{
+					Code:      "SearchByBeatmapSetId-007",
+					Path:      c.Path(),
+					RequestId: c.GetReqHeaders()["X-Request-ID"],
+					Error:     fiber.ErrNotFound.Error(),
+					Message:   "",
+				})
+			}
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(bodyStruct.ErrorStruct{
+				Code:      "SearchByBeatmapSetId-008",
+				Path:      c.Path(),
+				RequestId: c.GetReqHeaders()["X-Request-ID"],
+				Error:     err.Error(),
+				Message:   "RDBMS Request Error.",
+			})
 		}
 		set.Beatmaps = append(set.Beatmaps, Map)
 
 	}
 
-	return c.JSON(http.StatusOK, set)
+	c.Status(http.StatusOK)
+	return c.JSON(set)
 }

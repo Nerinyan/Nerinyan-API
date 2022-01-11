@@ -147,19 +147,17 @@ func queryBuilder(s *SearchQuery) (qs string, i []interface{}) {
 }
 
 type SearchQuery struct {
-	Status   string `query:"s" json:"s"`       // 랭크상태
-	Mode     string `query:"m" json:"m"`       // 게임모드
-	Sort     string `query:"sort" json:"sort"` // 정렬
-	Page     string `query:"p" json:"p"`       // 페이지
-	Text     string `query:"q" json:"q"`       // 문자열 검색
-	MapSetId int    `param:"si"`               // 맵셋id로 검색
-	MapId    int    `param:"mi"`               // 맵id로 검색
+	Status string `query:"s" json:"s"`       // 랭크상태
+	Mode   string `query:"m" json:"m"`       // 게임모드
+	Sort   string `query:"sort" json:"sort"` // 정렬
+	Page   string `query:"p" json:"p"`       // 페이지
+	Text   string `query:"q" json:"q"`       // 문자열 검색
 }
 
 func Search(c *fiber.Ctx) (err error) {
 
 	var sq SearchQuery
-	err = c.BodyParser(&sq)
+	err = c.QueryParser(&sq)
 	if err != nil {
 		pterm.Error.Println(err)
 		c.Status(http.StatusInternalServerError)
